@@ -5,45 +5,67 @@ const CHARACTERISTIC_UUID = "2a2b";
 
 const standardUuid = uuid => `0000${uuid}-0000-1000-8000-00805f9b34fb`;
 
-let data;
+async function onButtonClick() {
+  try {
+    console.log("Requesting any Bluetooth Device...");
+    const device = await navigator.bluetooth.requestDevice({
+      //  filters: [
+      //   {
+      //     services: [standardUuid(SERVICE_UUID)]
+      //   }
+      // ]
+      acceptAllDevices: true
+      // optionalServices: optionalServices
+    });
 
-function onStartNotify() {
-  navigator.bluetooth
-    .requestDevice({
-      filters: [
-        {
-          services: [standardUuid(SERVICE_UUID)]
-        }
-      ]
-    })
-    .then(device => {
-      console.log("デバイスを選択しました。接続します。");
-      console.log("デバイス名 : " + device.name);
-      return device.gatt.connect();
-    })
-    .then(server => {
-      console.log("デバイスへの接続に成功しました。サービスを取得します。");
-      return server.getPrimaryService(standardUuid(SERVICE_UUID));
-    })
-    .then(service => {
+    console.log("デバイスを選択しました。接続します。");
+    console.log("デバイス名 : " + device.name);
+    const server = await device.gatt.connect();
+
+    console.log("デバイスへの接続に成功しました。サービスを取得します。");
+    // const service = await server.getPrimaryService(standardUuid(SERVICE_UUID));
+    const services = await server.getPrimaryServices();
+    console.log(services);
+
+    for (const service of services) {
+      console.log("> Service: " + service.uuid);
       console.log(
         "サービスの取得に成功しました。キャラクタリスティックを取得します。"
       );
-      return service.getCharacteristic(standardUuid(CHARACTERISTIC_UUID));
-    })
-    .then(characteristic => {
-      data = characteristic;
-      console.log(
-        data.readValue().then(value => {
-          console.log(value.getUint16());
-          document.getElementById("data").innerHTML = value.getUint16();
-        })
-      );
-      console.log("BLE接続が完了しました。");
 
-      // characteristic.startNotifications();
-    })
-    .catch(error => {
-      console.log("Error : " + error);
-    });
+      // const characteristic = await service.getCharacteristic(standardUuid(CHARACTERISTIC_UUID));
+      const characteristics = await service.getCharacteristics();
+
+      characteristics.forEach(characteristic => {
+        console.log(
+          ">> Characteristic: " +
+            characteristic.uuid +
+            " " +
+            getSupportedProperties(characteristic)
+        );
+        addList(getSupportedProperties(characteristic));
+      });
+
+      console.log("BLE接続が完了しました。");
+    }
+  } catch (error) {
+    console.log("Argh! " + error);
+  }
+}
+
+function getSupportedProperties(characteristic) {
+  let supportedProperties = [];
+  for (const p in characteristic.properties) {
+    if (characteristic.properties[p] === true) {
+      supportedProperties.push(p.toUpperCase());
+    }
+  }
+  return "[" + supportedProperties.join(", ") + "]";
+}
+
+function addList(data) {
+  const ul = document.getElementById("data");
+  const li = document.createElement("li");
+  li.appendChild(document.createTextNode(data));
+  ul.appendChild(li);
 }
